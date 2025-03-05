@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Drift Detection Simulator</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+</head>
+<body>
+    <div class="container border p-3 m-2">
+        <h1 class="h2">Drift Detection Simulator</h1>
+        
+        <!-- Dataset upload -->
+        <div class="container border mb-2 p-2">
+            <form id="upload-form">
+                <div class="form-group">
+                    <label for="file-upload">Select Dataset</label>
+                    <input type="file" id="file-upload" name="file" class="form-control-file" aria-describedby="fileHelp">
+                    <small id="fileHelp" class="form-text text-muted">Upload a ZIP file containing the image dataset for time series analysis.</small>
+                </div>
+                <button type="button" class="btn btn-primary" onclick="uploadDataset()">Upload Dataset</button>
+                <button type="button" class="btn btn-danger" onclick="deleteDataset()">Delete Dataset</button>
+            </form>
+        </div>
+
+        <!-- Modifier options -->
+        <div class="container border mb-2 p-2">
+            <p class="h3">Modifiers</p>
+            <div class="form-group">
+                <label><input type="checkbox" id="gaussian"> Gaussian Noise</label>
+                <label><input type="checkbox" id="shot_noise"> Shot Noise</label>
+                <label><input type="checkbox" id="impulse_noise"> Impulse Noise</label>
+                <label><input type="checkbox" id="speckle_noise"> Speckle Noise</label>
+                <label><input type="checkbox" id="gradual_drift"> Gradual Drift</label>
+                <label><input type="checkbox" id="sudden_drift"> Sudden Drift</label>
+            </div>
+            <button class="btn btn-primary" onclick="simulateModifiers()">Apply Modifiers and Simulate</button>
+        </div>
+
+        <!-- Visualization -->
+        <div>
+            <h2>Original Image</h2>
+            <img id="original-image" src="" alt="Original Image">
+        </div>
+        <div>
+            <h2>Image after Modifier</h2>
+            <img id="modified-image" src="" alt="Modified Image">
+        </div>
+    
+        <script>
+            function visualize() {
+                const originalImageElement = document.getElementById('original-image');
+                const modifiedImageElement = document.getElementById('modified-image');
+    
+                const eventSource = new EventSource('/simulate');
+    
+                eventSource.onmessage = function(event) {
+                    const data = JSON.parse(event.data);
+                    originalImageElement.src = 'data:image/png;base64,' + data.original_image;
+                    modifiedImageElement.src = 'data:image/png;base64,' + data.modified_image;
+                };
+            }
+        </script>
+    </div>
+
+    <script>
+        function uploadDataset() {
+            const fileInput = document.getElementById('file-upload');
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            fetch('/upload', { method: 'POST', body: formData })
+                .then(response => response.json())
+                .then(data => alert(data.message || data.error))
+                .catch(err => console.error('Error uploading dataset:', err));
+        }
+
+        function deleteDataset() {
+            fetch('/delete_dataset', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => alert(data.message || data.error))
+                .catch(err => console.error('Error deleting dataset:', err));
+        }
+
+        function simulateModifiers() {
+            const modifiers = {};
+            if (document.getElementById('gaussian').checked) modifiers['gaussian'] = 2;
+            if (document.getElementById('shot_noise').checked) modifiers['shot_noise'] = 2;
+            if (document.getElementById('impulse_noise').checked) modifiers['impulse_noise'] = 2;
+            if (document.getElementById('speckle_noise').checked) modifiers['speckle_noise'] = 2;
+            if (document.getElementById('gradual_drift').checked) modifiers['gradual_drift'] = 2;
+            if (document.getElementById('sudden_drift').checked) modifiers['sudden_drift'] = 2;
+
+            fetch('/simulate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(modifiers)
+            })
+            .then(response => response.json())
+            .then(data => {
+                // alert('Modifiers applied and data simulation complete.');
+                visualize();
+            })
+            .catch(err => console.error('Error during simulation:', err));
+        }
+
+        function visualizeData(modifiedData) {
+            const frame = modifiedData;
+            
+            // Visualize the Red channel (you can also use frame.map(row => row.map(pixel => pixel[1])) for Green or pixel[2] for Blue)
+            const redChannel = frame.map(row => row.map(pixel => pixel[0])); // Get the Red channel
+
+            // Create a heatmap trace for the Red channel
+            const trace = {
+                z: redChannel, // 2D array representing the Red channel intensities
+                type: 'heatmap',
+                colorscale: 'Reds', // A colorscale more suited for red intensity
+                colorbar: {
+                    title: 'Intensity'
+                },
+                name: `Red Channel`
+            };
+
+            // Plot the heatmap
+            Plotly.newPlot('plot', [trace], {
+                title: 'Red Channel',
+                xaxis: { title: 'Width' },
+                yaxis: { title: 'Height' }
+            });
+        }
+
+        // function visualizeData(modifiedData) {
+        //     // Assuming modifiedData is a 3D array with dimensions [numFrames][height][width][channels]
+        //     const numFrames = modifiedData.length;
+            
+        //     // Initialize an array to store traces for each frame
+        //     const frames = [];
+            
+        //     for (let i = 0; i < numFrames; i++) {
+        //         const frame = modifiedData[i];
+                
+        //         // Convert each frame (3D array) to a grayscale 2D array by averaging the RGB channels
+        //         const grayscaleFrame = frame.map(row => 
+        //             row.map(pixel => {
+        //                 // Check if the pixel is an array (RGB), otherwise treat as grayscale
+        //                 if (Array.isArray(pixel)) {
+        //                     // Average the RGB values to get a single grayscale intensity
+        //                     return pixel.reduce((sum, val) => sum + val, 0) / pixel.length;
+        //                 } else {
+        //                     // If the pixel is already a scalar (grayscale), use it directly
+        //                     return pixel;
+        //                 }
+        //             })
+        //         );
+
+        //         // Create a heatmap trace for the grayscale image of the current frame
+        //         const trace = {
+        //             z: grayscaleFrame, // 2D array representing pixel intensities
+        //             type: 'heatmap',
+        //             colorscale: 'Viridis',
+        //             colorbar: {
+        //                 title: 'Intensity'
+        //             },
+        //             name: `Frame ${i + 1}`
+        //         };
+
+        //         // Push the trace to the frames array
+        //         frames.push(trace);
+        //     }
+
+        //     // Plot all frames on the same plot
+        //     Plotly.newPlot('plot', frames, {
+        //         title: 'Image Frames',
+        //         xaxis: { title: 'Width' },
+        //         yaxis: { title: 'Height' },
+        //         showlegend: true
+        //     });
+        // }
+
+
+
+
+
+
+    </script>
+</body>
+</html>

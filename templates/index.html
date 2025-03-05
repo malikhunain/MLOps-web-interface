@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Drift Detection Simulator</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+</head>
+<body>
+    <div class="container border p-3 m-2">
+        <h1 class="h2">Drift Detection Simulator</h1>
+        
+        <!-- Dataset upload -->
+        <div class="container border mb-2 p-2">
+            <form id="upload-form">
+                <div class="form-group">
+                    <label for="file-upload">Select Dataset</label>
+                    <input type="file" id="file-upload" name="file" class="form-control-file" aria-describedby="fileHelp">
+                    <small id="fileHelp" class="form-text text-muted">Upload a ZIP file containing the image dataset for time series analysis.</small>
+                </div>
+                <button type="button" class="btn btn-primary" onclick="uploadDataset()">Upload Dataset</button>
+                <button type="button" class="btn btn-danger" onclick="deleteDataset()">Delete Dataset</button>
+            </form>
+        </div>
+
+        <!-- Modifier options -->
+        <div class="container border mb-2 p-2">
+            <p class="h3">Modifiers</p>
+            <div class="form-group">
+                <label><input type="checkbox" id="gaussian"> Gaussian Noise</label>
+                <label><input type="checkbox" id="shot_noise"> Shot Noise</label>
+                <label><input type="checkbox" id="impulse_noise"> Impulse Noise</label>
+                <label><input type="checkbox" id="speckle_noise"> Speckle Noise </label>
+                <label><input type="checkbox" id="gradual_drift"> Gradual Drift</label>
+                <label><input type="checkbox" id="sudden_drift"> Sudden Drift</label>
+            </div>
+            <button class="btn btn-primary" onclick="simulateModifiers()">Apply Modifiers and Simulate</button>
+        </div>
+
+        <!-- Visualization -->
+
+        <div style="display: flex;">
+            <div style="border: 2px solid grey;">
+                <h2>Original Image</h2>
+                <img id="original-image" src="" alt="Loading...." style="width: 400px;">
+            </div>
+            <div style="margin-left: 50px; border: 2px solid gray;">
+                <h2>Image after Modifier</h2>
+                <img id="modified-image" src="" alt="Processing...." style="width: 400px;">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function uploadDataset() {
+            const fileInput = document.getElementById('file-upload');
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            fetch('/upload', { method: 'POST', body: formData })
+                .then(response => response.json())
+                .then(data => alert(data.message || data.error))
+                .catch(err => console.error('Error uploading dataset:', err));
+        }
+
+        function deleteDataset() {
+            fetch('/delete_dataset', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => alert(data.message || data.error))
+                .catch(err => console.error('Error deleting dataset:', err));
+        }
+
+        let activeStream = null; // Keep track of the active EventSource
+
+        function simulateModifiers() {
+            const originalImageElement = document.getElementById('original-image');
+            const modifiedImageElement = document.getElementById('modified-image');
+
+            // Close the existing stream if there is one
+            if (activeStream) {
+                activeStream.close();
+                console.log("Previous stream terminated");
+            }
+
+            const modifiers = {};
+            if (document.getElementById('gaussian').checked) modifiers['gaussian'] = 2;
+            if (document.getElementById('shot_noise').checked) modifiers['shot_noise'] = 2;
+            if (document.getElementById('impulse_noise').checked) modifiers['impulse_noise'] = 2;
+            if (document.getElementById('speckle_noise').checked) modifiers['speckle_noise'] = 2;
+            if (document.getElementById('gradual_drift').checked) modifiers['gradual_drift'] = 2;
+            if (document.getElementById('sudden_drift').checked) modifiers['sudden_drift'] = 2;
+
+            const streamUrl = `/simulate?modifiers=${encodeURIComponent(JSON.stringify(modifiers))}`;
+            activeStream = new EventSource(streamUrl); // Start a new stream
+
+            activeStream.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                originalImageElement.src = 'data:image/png;base64,' + data.original_image;
+                modifiedImageElement.src = 'data:image/png;base64,' + data.modified_image;
+            };
+
+            activeStream.onerror = function() {
+                console.error("Error with EventSource");
+                activeStream.close(); // Ensure the stream is closed on error
+                activeStream = null;
+            };
+        }
+
+    </script>
+</body>
+</html>

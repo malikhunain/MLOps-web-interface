@@ -1,0 +1,6 @@
+Flask==2.2.2
+numpy==1.24.2
+Pillow==9.5.0
+torch==1.13.1
+flask_sse==0.2.1
+redis==4.5.5
