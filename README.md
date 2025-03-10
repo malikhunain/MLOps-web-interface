@@ -5,11 +5,11 @@ This project is a Drift Detection Simulator built using Flask. It allows users t
 ## Project Structure
 MLOps-web-interface
 - processed (if not present then generated automatically)
-- - - images.zip (processed dataset)
+- - images.zip (processed dataset)
 - uploads (if not present then generated automatically)
-- - - images.zip (uploaded dataset)
+- - images.zip (uploaded dataset)
 - templates
-- - - index.html
+- - index.html
 - flask_app.py
 - modifiers.py
 - deploy-flask-app.sh (bash script for cluster)
